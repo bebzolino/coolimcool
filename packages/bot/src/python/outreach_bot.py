@@ -18,6 +18,7 @@ DATABASE_URL_KEYS = (
     "POSTGRES_URL",
     "POSTGRES_PRIVATE_URL",
 )
+DATABASE_ENV_HINTS = ("DATABASE", "POSTGRES", "PG")
 
 
 def get_database_url() -> str:
@@ -38,6 +39,14 @@ def get_database_url() -> str:
             auth = f"{auth}:{quote(password)}"
         logging.info("Using database connection from PGHOST/PGUSER/PGDATABASE.")
         return f"postgresql://{auth}@{host}:{port}/{quote(database)}"
+
+    visible_database_keys = sorted(
+        key for key in os.environ if any(hint in key.upper() for hint in DATABASE_ENV_HINTS)
+    )
+    if visible_database_keys:
+        logging.error("Visible database-related env keys: %s", ", ".join(visible_database_keys))
+    else:
+        logging.error("No database-related env keys are visible to the bot service.")
 
     raise RuntimeError(
         "Database connection is missing. Set DATABASE_URL on the Railway bot service "
