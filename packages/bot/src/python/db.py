@@ -18,6 +18,140 @@ class Database:
     async def run(self, fn, *args):
         return await asyncio.to_thread(fn, *args)
 
+    async def ensure_schema(self) -> None:
+        await self.run(self._ensure_schema)
+
+    def _ensure_schema(self) -> None:
+        with self.connect() as conn:
+            with conn.cursor() as cur:
+                cur.execute('CREATE EXTENSION IF NOT EXISTS "pgcrypto"')
+                cur.execute(
+                    """
+                    CREATE TABLE IF NOT EXISTS "SystemConfig" (
+                        id TEXT PRIMARY KEY DEFAULT 'default',
+                        "welcomeMessage" TEXT NOT NULL DEFAULT 'Hey! Welcome.\n\nHave you played Crystal PvP before?\n\nReply here if you''d like help getting started.',
+                        "followupMessage" TEXT NOT NULL DEFAULT 'Just checking in!\n\nIf you''d like help getting started, feel free to reply.',
+                        "initialDelayMinutes" INTEGER NOT NULL DEFAULT 15,
+                        "followupDelayHours" INTEGER NOT NULL DEFAULT 24,
+                        "enableAi" BOOLEAN NOT NULL DEFAULT TRUE,
+                        "confidenceThreshold" DOUBLE PRECISION NOT NULL DEFAULT 0.7,
+                        "webhookUrl" TEXT NOT NULL DEFAULT '',
+                        "staffRole" TEXT NOT NULL DEFAULT '',
+                        "typingSimulation" BOOLEAN NOT NULL DEFAULT TRUE,
+                        "enableFriendRequests" BOOLEAN NOT NULL DEFAULT FALSE,
+                        "userToken" TEXT NOT NULL DEFAULT '',
+                        "geminiApiKey" TEXT NOT NULL DEFAULT '',
+                        "enablePings" BOOLEAN NOT NULL DEFAULT FALSE,
+                        "pingChannelId" TEXT NOT NULL DEFAULT '',
+                        "pingMessage" TEXT NOT NULL DEFAULT 'Hey <@{userId}>, just following up — did you get a chance to see the last message?',
+                        "pingDelayHours" INTEGER NOT NULL DEFAULT 48,
+                        "captchaSolver" TEXT NOT NULL DEFAULT '',
+                        "captchaKey" TEXT NOT NULL DEFAULT '',
+                        "friendRequestDelayMinutes" INTEGER NOT NULL DEFAULT 0,
+                        "typingSpeedMultiplier" DOUBLE PRECISION NOT NULL DEFAULT 1.0,
+                        "capsolverKey" TEXT NOT NULL DEFAULT '',
+                        "anysolverKey" TEXT NOT NULL DEFAULT '',
+                        "captchaProxy" TEXT NOT NULL DEFAULT '',
+                        "botPort" INTEGER NOT NULL DEFAULT 3001,
+                        "safetyMinInitialDmDelayMinutes" INTEGER NOT NULL DEFAULT 10,
+                        "safetyMinFriendRequestDelayMinutes" INTEGER NOT NULL DEFAULT 30,
+                        "safetyDmCooldownSeconds" INTEGER NOT NULL DEFAULT 120,
+                        "safetyFriendRequestCooldownSeconds" INTEGER NOT NULL DEFAULT 900,
+                        "safetyDmCooldownMinMs" INTEGER NOT NULL DEFAULT 120000,
+                        "safetyDmCooldownMaxMs" INTEGER NOT NULL DEFAULT 240000,
+                        "safetyFriendRequestCooldownMinMs" INTEGER NOT NULL DEFAULT 900000,
+                        "safetyFriendRequestCooldownMaxMs" INTEGER NOT NULL DEFAULT 1800000,
+                        "safetyFailureCooldownMinutes" INTEGER NOT NULL DEFAULT 30,
+                        "safetyMaxDmPerHour" INTEGER NOT NULL DEFAULT 6,
+                        "safetyMaxFriendRequestsPerHour" INTEGER NOT NULL DEFAULT 2,
+                        "queueScanIntervalSeconds" INTEGER NOT NULL DEFAULT 60,
+                        "queueDmSpreadSeconds" INTEGER NOT NULL DEFAULT 120,
+                        "queueFriendRequestSpreadSeconds" INTEGER NOT NULL DEFAULT 900
+                    )
+                    """
+                )
+                cur.execute(
+                    """
+                    CREATE TABLE IF NOT EXISTS "Account" (
+                        id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::TEXT,
+                        token TEXT NOT NULL,
+                        username TEXT NOT NULL DEFAULT '',
+                        status TEXT NOT NULL DEFAULT 'active',
+                        "lastUsedAt" TIMESTAMPTZ,
+                        "createdAt" TIMESTAMPTZ NOT NULL DEFAULT NOW()
+                    )
+                    """
+                )
+                cur.execute(
+                    """
+                    CREATE TABLE IF NOT EXISTS "Member" (
+                        "userId" TEXT PRIMARY KEY,
+                        username TEXT NOT NULL,
+                        "joinTime" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                        status TEXT NOT NULL DEFAULT 'pending',
+                        "interestScore" DOUBLE PRECISION,
+                        "interestLevel" TEXT,
+                        sentiment TEXT,
+                        tags TEXT,
+                        "isToxic" BOOLEAN NOT NULL DEFAULT FALSE,
+                        "assignedAccountId" TEXT REFERENCES "Account"(id) ON DELETE SET NULL ON UPDATE CASCADE,
+                        "friendRequestStatus" TEXT NOT NULL DEFAULT 'idle'
+                    )
+                    """
+                )
+                cur.execute(
+                    """
+                    CREATE TABLE IF NOT EXISTS "Conversation" (
+                        id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::TEXT,
+                        "userId" TEXT NOT NULL REFERENCES "Member"("userId") ON DELETE CASCADE ON UPDATE CASCADE,
+                        message TEXT NOT NULL,
+                        timestamp TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                        direction TEXT NOT NULL,
+                        "accountId" TEXT
+                    )
+                    """
+                )
+                cur.execute(
+                    """
+                    CREATE TABLE IF NOT EXISTS "Notification" (
+                        id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::TEXT,
+                        "userId" TEXT NOT NULL REFERENCES "Member"("userId") ON DELETE CASCADE ON UPDATE CASCADE,
+                        "sentAt" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                        status TEXT NOT NULL
+                    )
+                    """
+                )
+                cur.execute(
+                    """
+                    CREATE TABLE IF NOT EXISTS "Log" (
+                        id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::TEXT,
+                        message TEXT NOT NULL,
+                        level TEXT NOT NULL DEFAULT 'info',
+                        timestamp TIMESTAMPTZ NOT NULL DEFAULT NOW()
+                    )
+                    """
+                )
+                cur.execute(
+                    """
+                    CREATE TABLE IF NOT EXISTS "BlacklistEntry" (
+                        id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::TEXT,
+                        type TEXT NOT NULL,
+                        value TEXT NOT NULL,
+                        label TEXT NOT NULL DEFAULT '',
+                        "createdAt" TIMESTAMPTZ NOT NULL DEFAULT NOW()
+                    )
+                    """
+                )
+                cur.execute(
+                    'CREATE UNIQUE INDEX IF NOT EXISTS "BlacklistEntry_type_value_key" ON "BlacklistEntry" (type, value)'
+                )
+                cur.execute(
+                    'INSERT INTO "SystemConfig" (id) VALUES (%s) ON CONFLICT (id) DO NOTHING',
+                    ("default",),
+                )
+            conn.commit()
+        logging.info("Database schema is ready.")
+
     async def fetch_config(self) -> dict:
         return await self.run(self._fetch_config)
 

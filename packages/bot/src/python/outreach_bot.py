@@ -58,7 +58,9 @@ async def main_async() -> int:
     load_dotenv()
     logging.basicConfig(level=logging.INFO, format=LOG_FORMAT)
 
-    state = BotState(Database(get_database_url()))
+    db = Database(get_database_url())
+    await db.ensure_schema()
+    state = BotState(db)
     captcha.set_bot_state(state)
     await state.start()
     await start_http_server(state)
