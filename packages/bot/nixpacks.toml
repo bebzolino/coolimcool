@@ -1,0 +1,14 @@
+[phases.setup]
+nixPkgs = ["nodejs_20", "python311", "python311Packages.pip"]
+
+[phases.install]
+cmds = [
+  "python -m pip install --upgrade pip",
+  "python -m pip install -r src/python/requirements.txt"
+]
+
+[phases.build]
+cmds = ["python -m py_compile src/python/outreach_bot.py"]
+
+[start]
+cmd = "python src/python/outreach_bot.py"
