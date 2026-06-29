@@ -1,0 +1,18 @@
+[phases.setup]
+nixPkgs = ["nodejs_20", "python311", "python311Packages.pip"]
+
+[phases.install]
+cmds = [
+  "npm ci",
+  "python -m pip install --upgrade pip",
+  "python -m pip install -r packages/bot/src/python/requirements.txt"
+]
+
+[phases.build]
+cmds = [
+  "npm run db:generate",
+  "npm run build -w packages/bot"
+]
+
+[start]
+cmd = "npm start -w packages/bot"
