@@ -189,6 +189,18 @@ class Database:
                 )
                 return int(cur.fetchone()[0]) > 0
 
+    async def is_whitelisted_guild(self, guild_id: str) -> bool:
+        return await self.run(self._is_whitelisted_guild, guild_id)
+
+    def _is_whitelisted_guild(self, guild_id: str) -> bool:
+        with self.connect() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    'SELECT COUNT(*) FROM "BlacklistEntry" WHERE type = %s AND value = %s',
+                    ("guild_whitelist", guild_id),
+                )
+                return int(cur.fetchone()[0]) > 0
+
     async def fetch_accounts(self, statuses: tuple[str, ...]) -> list[dict]:
         return await self.run(self._fetch_accounts, statuses)
 

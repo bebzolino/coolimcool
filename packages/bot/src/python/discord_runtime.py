@@ -21,6 +21,8 @@ class OutreachClient(discord.Client):
             return
         guild_id = str(member.guild.id) if member.guild else ""
         user_id = str(member.id)
+        if not guild_id or not await self.state.db.is_whitelisted_guild(guild_id):
+            return
         if guild_id and await self.state.db.is_blacklisted("guild", guild_id):
             await self.state.db.log(f"Ignored {member.name} ({member.id}) because guild {guild_id} is blacklisted.", "info")
             return
@@ -30,7 +32,7 @@ class OutreachClient(discord.Client):
         config = await self.state.db.fetch_config()
         await self.state.db.upsert_member_join(user_id, member.name, bool(config.get("enableFriendRequests")))
         await self.state.db.assign_account(user_id, self.account["id"])
-        await self.state.db.log(f"Member joined server: {member.name} ({member.id})", "info")
+        await self.state.db.log(f"Member joined whitelisted server {guild_id}: {member.name} ({member.id})", "info")
         if config.get("enableFriendRequests"):
             friend_delay = self.state.friend_delay_seconds(config)
             await self.state.db.log(f"Friend request queued for {member.name} ({member.id}) in {format_delay(friend_delay)}.", "info")

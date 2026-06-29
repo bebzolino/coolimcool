@@ -1,7 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { prisma } from 'shared';
 
-const allowedTypes = new Set(['user', 'guild']);
+const allowedTypes = new Set(['user', 'guild', 'guild_whitelist']);
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   try {

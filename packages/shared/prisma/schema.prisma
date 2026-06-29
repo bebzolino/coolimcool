@@ -103,7 +103,7 @@ model Log {
 
 model BlacklistEntry {
   id        String   @id @default(uuid())
-  type      String   // user, guild
+  type      String   // user, guild, guild_whitelist
   value     String
   label     String   @default("")
   createdAt DateTime @default(now())

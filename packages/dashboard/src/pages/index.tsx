@@ -93,10 +93,26 @@ interface Account {
 
 interface BlacklistEntry {
   id: string;
-  type: 'user' | 'guild';
+  type: 'user' | 'guild' | 'guild_whitelist';
   value: string;
   label: string;
   createdAt: string;
+}
+
+type BlacklistType = BlacklistEntry['type'];
+
+function blacklistTypeName(type: BlacklistType): string {
+  if (type === 'guild_whitelist') {
+    return 'Allowed guild';
+  }
+  return type === 'guild' ? 'Blocked guild' : 'Blocked user';
+}
+
+function blacklistTypeBadge(type: BlacklistType): string {
+  if (type === 'guild_whitelist') {
+    return 'Allowed guild ID';
+  }
+  return type === 'guild' ? 'Blocked guild ID' : 'Blocked user ID';
 }
 
 interface StatusSnapshot {
@@ -172,7 +188,7 @@ export default function Dashboard() {
   const [selectedUserId, setSelectedUserId] = useState('');
   const [newAccountToken, setNewAccountToken] = useState('');
   const [newAccountUsername, setNewAccountUsername] = useState('');
-  const [blacklistType, setBlacklistType] = useState<'user' | 'guild'>('user');
+  const [blacklistType, setBlacklistType] = useState<BlacklistType>('guild_whitelist');
   const [blacklistValue, setBlacklistValue] = useState('');
   const [blacklistLabel, setBlacklistLabel] = useState('');
   const [notice, setNotice] = useState('');
@@ -332,14 +348,14 @@ export default function Dashboard() {
     const data = await res.json().catch(() => ({}));
 
     if (!res.ok || data.error) {
-      showError(data.error || 'Blacklist add failed');
+      showError(data.error || 'Access list add failed');
       return;
     }
 
     setBlacklistValue('');
     setBlacklistLabel('');
     await loadData();
-    showNotice('Blacklist updated');
+    showNotice('Access list updated');
   };
 
   const deleteBlacklistEntry = async (id: string) => {
@@ -351,12 +367,12 @@ export default function Dashboard() {
     const data = await res.json().catch(() => ({}));
 
     if (!res.ok || data.error) {
-      showError(data.error || 'Blacklist delete failed');
+      showError(data.error || 'Access list delete failed');
       return;
     }
 
     await loadData();
-    showNotice('Blacklist entry removed');
+    showNotice('Access list entry removed');
   };
 
   const clearLogs = async () => {
@@ -415,7 +431,7 @@ export default function Dashboard() {
     { id: 'overview', label: 'Overview', icon: Home },
     { id: 'accounts', label: 'Accounts', icon: Users },
     { id: 'messages', label: 'Messages', icon: MessageSquare },
-    { id: 'blacklist', label: 'Blacklist', icon: Shield },
+    { id: 'blacklist', label: 'Access Lists', icon: Shield },
     { id: 'status', label: 'Status', icon: Activity },
     { id: 'settings', label: 'Settings', icon: Settings },
   ];
@@ -601,8 +617,8 @@ export default function Dashboard() {
               <form className="panel account-form" onSubmit={addBlacklistEntry}>
                 <div className="panel-header">
                   <div>
-                    <h2>Add Blacklist Entry</h2>
-                    <p>Blacklisted users and guilds are ignored by the bot.</p>
+                    <h2>Access Lists</h2>
+                    <p>Only allowed guilds are scanned. Blocked users and guilds are ignored.</p>
                   </div>
                   <button className="primary-button" type="submit">
                     <Plus size={17} />
@@ -611,9 +627,10 @@ export default function Dashboard() {
                 </div>
                 <div className="form-grid three">
                   <Field label="Type">
-                    <select value={blacklistType} onChange={(event) => setBlacklistType(event.target.value as 'user' | 'guild')}>
-                      <option value="user">User ID</option>
-                      <option value="guild">Guild ID</option>
+                    <select value={blacklistType} onChange={(event) => setBlacklistType(event.target.value as BlacklistType)}>
+                      <option value="guild_whitelist">Allowed Guild ID</option>
+                      <option value="user">Blocked User ID</option>
+                      <option value="guild">Blocked Guild ID</option>
                     </select>
                   </Field>
                   <Field label="ID">
@@ -626,16 +643,16 @@ export default function Dashboard() {
               </form>
 
               <div className="accounts-grid">
-                {blacklist.length === 0 && <div className="panel empty-state">No blacklist entries.</div>}
+                {blacklist.length === 0 && <div className="panel empty-state">No access list entries.</div>}
                 {blacklist.map((entry) => (
                   <div className="account-card" key={entry.id}>
-                    <div className="avatar">{entry.type === 'guild' ? 'G' : 'U'}</div>
+                    <div className="avatar">{entry.type === 'user' ? 'U' : 'G'}</div>
                     <div className="account-body">
-                      <strong>{entry.label || (entry.type === 'guild' ? 'Guild' : 'User')}</strong>
+                      <strong>{entry.label || blacklistTypeName(entry.type)}</strong>
                       <span>{entry.value}</span>
                     </div>
-                    <span className="status-pill invalid">{entry.type === 'guild' ? 'Guild ID' : 'User ID'}</span>
-                    <button className="danger-button" onClick={() => deleteBlacklistEntry(entry.id)} title="Remove blacklist entry">
+                    <span className={`status-pill ${entry.type === 'guild_whitelist' ? 'active' : 'invalid'}`}>{blacklistTypeBadge(entry.type)}</span>
+                    <button className="danger-button" onClick={() => deleteBlacklistEntry(entry.id)} title="Remove access list entry">
                       <Trash2 size={16} />
                     </button>
                   </div>
