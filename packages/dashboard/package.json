@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "next dev",
     "build": "npm run build -w shared && next build",
-    "start": "next start"
+    "start": "node start.js"
   },
   "dependencies": {
     "next": "^14.2.3",
