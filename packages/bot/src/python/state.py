@@ -161,7 +161,8 @@ class BotState:
     async def run_scheduled(self, username: str, user_id: str, kind: str, delay_seconds: float, callback) -> None:
         await asyncio.sleep(delay_seconds)
         ok = await callback(user_id)
-        await self.db.log(f"{self.task_label(kind)} {'sent' if ok else 'failed'} for {username} ({user_id}).", "success" if ok else "error")
+        if ok:
+            await self.db.log(f"{self.task_label(kind)} sent for {username} ({user_id}).", "success")
 
     def initial_delay_seconds(self, config: dict) -> int:
         return max(positive_int(config.get("initialDelayMinutes"), 0), positive_int(config.get("safetyMinInitialDmDelayMinutes"), 0)) * 60
