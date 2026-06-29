@@ -15,4 +15,4 @@ RUN python -m pip install --no-cache-dir --upgrade pip \
 
 COPY src/python ./src/python
 
-CMD ["python", "src/python/outreach_bot.py"]
+CMD ["python3", "src/python/outreach_bot.py"]

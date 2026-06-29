@@ -1,0 +1,9 @@
+[build]
+builder = "DOCKERFILE"
+dockerfilePath = "Dockerfile"
+buildCommand = null
+
+[deploy]
+startCommand = "python3 src/python/outreach_bot.py"
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 10
