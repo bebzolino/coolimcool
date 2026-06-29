@@ -1,120 +1,73 @@
-# Discord Selfbot Onboarding System
+# Customer404
 
-Automated welcome system for Discord servers: friend requests, DMs, AI analysis, captcha solving, alt rotation, and a web dashboard.
+Discord outreach dashboard with a Python bot worker and a Next.js control panel.
 
-## Railway Setup
+## Railway
 
-### 1. Deploy
+This repo is intended to run as two Railway services from the same repository.
 
-1. Fork this repo
-2. Go to [Railway](https://railway.app) → New Project → Deploy from GitHub
-3. Select your fork
+### Dashboard service
 
-### 2. Add PostgreSQL Database
+- Root directory: repository root
+- Builder: Dockerfile
+- Dockerfile: `Dockerfile.dashboard`
+- Public domain: enabled
+- Required variable: `DATABASE_URL`
 
-1. In Railway dashboard → **New** → **Database** → **PostgreSQL**
-2. Copy the **Database URL** from the PostgreSQL service
-3. Add it as env var to your bot service: `DATABASE_URL` = `<paste URL>`
+The root `railway.toml` is configured for the dashboard service.
 
-### 3. Bot Service Env Vars
+### Bot service
 
-If Railway asks for a root directory for the bot service, set it to `packages/bot`.
+- Root directory: `packages/bot`
+- Builder: Dockerfile
+- Dockerfile: `Dockerfile`
+- Public domain: not required
+- Required variable: `DATABASE_URL`
 
-| Variable | Required | Description |
-|----------|----------|-------------|
-| `DATABASE_URL` | Yes | PostgreSQL connection string from step 2 |
-| `BOT_API_PORT` | No | HTTP control server port (default: `8080`) |
+The bot service uses `packages/bot/railway.toml`.
 
-That's it — no token or API keys needed in env vars. Everything is configured from the Dashboard.
+## Database
 
-### 4. Dashboard Service
+Use PostgreSQL. Both services must point at the same database.
 
-1. Railway → **New** → **Service** → **GitHub Repo** (same repo)
-2. Set root directory to `packages/dashboard`
-3. Add env var: `DATABASE_URL` = same as bot service
-4. Railway auto-detects Next.js and deploys
+The bot creates the required tables on startup if the database is empty:
 
-### 5. Initial Setup
+- `SystemConfig`
+- `Account`
+- `Member`
+- `Conversation`
+- `Notification`
+- `Log`
+- `BlacklistEntry`
 
-1. Open your Dashboard URL
-2. Go to **Settings** tab
-3. Configure:
-   - **User Token** — your Discord user token (selfbot)
-   - **Webhook URL** — Discord webhook for notifications
-   - **CAPTCHA Solver** — select `2Captcha`
-   - **CAPTCHA API Key** — your 2Captcha key
-   - **Captcha Proxy** — residential proxy (e.g. `http://user:pass@host:port`)
-4. Click **Save**
+## Local Development
 
-### 6. Alt Accounts
+Install dependencies:
 
-1. Go to **Accounts** tab
-2. Click **+ Add Account**
-3. Enter Discord user token
-4. The bot will auto-login on next restart
-
-### 7. Server Join
-
-1. Go to **Simulator** tab
-2. Paste a Discord invite link
-3. Click **Join Server**
-
-## Captcha Solving (Important)
-
-Discord's hCaptcha **requires a residential proxy** to solve. Datacenter proxies get rejected with `invalid-response`.
-
-### Free Residential Proxy Options
-
-| Provider | Free | Credit Card | Link |
-|----------|------|-------------|------|
-| OkeyProxy | 1GB / 24h | No | [okeyproxy.com](https://www.okeyproxy.com/register) |
-| Webshare | 1GB / month | No | [webshare.io](https://www.webshare.io/features/free-proxy) |
-
-### Getting OkeyProxy Free Trial
-
-1. Register at [okeyproxy.com](https://www.okeyproxy.com/register)
-2. Use live chat on the site
-3. Say: "I need 1GB residential proxy free trial for Discord captcha solving"
-4. They'll give you credentials
-5. Set in Dashboard → Settings → Captcha Proxy:
-   ```
-   http://username:password@proxy.okeyproxy.com:port
-   ```
-
-## How It Works
-
-```
-Member joins server
-        ↓
-Friend request (if enabled)
-        ↓
-Captcha solved (2Captcha + proxy)
-        ↓
-Initial DM (after delay)
-        ↓
-AI analyzes reply → webhook notification
-        ↓
-Follow-up DM (if no reply, after 24h)
-        ↓
-Ping / mention (if no reply, after 48h)
+```bash
+npm install
 ```
 
-## Features
+Generate the Prisma client:
 
-- **Automated DMs** — welcome, follow-up, ping system
-- **Alt rotation** — LRU-based account switching on rate limit
-- **AI analysis** — Gemini AI or heuristic fallback
-- **Webhook notifications** — with full DM conversation log
-- **Captcha solving** — 2Captcha with proxy support
-- **Web Dashboard** — light/dark theme, all settings configurable
-- **Server joiner** — join via invite link from dashboard
-- **Friend requests** — automated with captcha handling
+```bash
+npm run db:generate
+```
 
-## Tech Stack
+Run the dashboard:
 
-- **Bot:** Python + discord.py-self
-- **Database:** PostgreSQL (Supabase)
-- **Dashboard:** Next.js 14
-- **AI:** Google Gemini
-- **Captcha:** 2Captcha
-- **Hosting:** Railway
+```bash
+npm run dev:dashboard
+```
+
+Run the bot:
+
+```bash
+npm run dev:bot
+```
+
+## Notes
+
+- Runtime secrets belong in environment variables, not in files.
+- Do not commit `.env`, tokens, proxies, local logs, or database dumps.
+- The dashboard blocks links in the welcome message in the UI, API, and bot runtime.
