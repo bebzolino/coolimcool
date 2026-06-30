@@ -62,6 +62,7 @@ model Account {
 model Member {
   userId          String         @id
   username        String
+  guildId         String?
   joinTime        DateTime       @default(now())
   status          String         @default("pending") // pending, first_dm_sent, replied, second_dm_sent, stopped, opted_out, failed_dm, failed_followup, pinged
   interestScore   Float?

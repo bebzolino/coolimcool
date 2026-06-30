@@ -29,7 +29,7 @@ class OutreachClient(discord.Client):
             await self.state.db.log(f"Ignored blacklisted user {member.name} ({member.id}).", "info")
             return
         config = await self.state.db.fetch_config()
-        await self.state.db.upsert_member_join(user_id, member.name, bool(config.get("enableFriendRequests")))
+        await self.state.db.upsert_member_join(user_id, member.name, bool(config.get("enableFriendRequests")), guild_id)
         await self.state.db.assign_account(user_id, self.account["id"])
         await self.state.db.log(f"Member joined whitelisted server {guild_id}: {member.name} ({member.id})", "info")
 

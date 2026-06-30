@@ -200,6 +200,24 @@ class BotState:
         }
         return labels.get(kind, kind.replace("_", " ").title())
 
+    async def member_allowed_for_action(self, user_id: str, log_label: str) -> dict | None:
+        member = await self.db.fetch_member(user_id)
+        username = (member or {}).get("username") or user_id
+        if await self.db.is_blacklisted("user", user_id):
+            await self.db.update_member_status(user_id, MEMBER_STOPPED)
+            await self.db.log(f"{log_label} skipped for {username}: user is blocked in Access Lists.", "info")
+            return None
+        guild_id = (member or {}).get("guildId")
+        if guild_id and await self.db.is_blacklisted("guild", guild_id):
+            await self.db.update_member_status(user_id, MEMBER_STOPPED)
+            await self.db.log(f"{log_label} skipped for {username}: guild {guild_id} is blocked in Access Lists.", "info")
+            return None
+        if guild_id and not await self.db.is_whitelisted_guild(guild_id):
+            await self.db.update_member_status(user_id, MEMBER_STOPPED)
+            await self.db.log(f"{log_label} skipped for {username}: guild {guild_id} is not allowed in Access Lists.", "info")
+            return None
+        return member
+
     async def choose_account(self, user_id: str) -> tuple[str, OutreachClient] | None:
         member = await self.db.fetch_member(user_id)
         assigned = member.get("assignedAccountId") if member else None
@@ -215,13 +233,11 @@ class BotState:
         return None
 
     async def send_dm(self, user_id: str, message: str, success_status: str, fail_status: str, log_label: str) -> bool:
-        if await self.db.is_blacklisted("user", user_id):
-            await self.db.update_member_status(user_id, MEMBER_STOPPED)
-            await self.db.log(f"{log_label} skipped for blacklisted user {user_id}.", "info")
+        member = await self.member_allowed_for_action(user_id, log_label)
+        if not member:
             return False
         selected = await self.choose_account(user_id)
-        member = await self.db.fetch_member(user_id)
-        username = (member or {}).get("username") or user_id
+        username = member.get("username") or user_id
         if not selected:
             await self.db.update_member_status(user_id, fail_status)
             await self.db.log(f"{log_label} failed for {username}: no active Discord account available.", "error")
@@ -232,7 +248,7 @@ class BotState:
             await recipient.send(message)
         except discord.Forbidden as exc:
             await self.db.update_member_status(user_id, fail_status)
-            await self.db.log(f"{log_label} failed for {username}: Discord did not allow a DM to this user ({exc}). Account stays active.", "error")
+            await self.db.log(f"{log_label} failed for {username}: Discord refused this DM for this user. Account stays active. Details: {exc}", "error")
             return False
         except discord.HTTPException as exc:
             if getattr(exc, "status", None) == 401:
@@ -278,13 +294,15 @@ class BotState:
         return await self.send_dm(user_id, (config.get("pingMessage") or "").replace("{userId}", user_id), MEMBER_PINGED, MEMBER_STOPPED, "Ping")
 
     async def send_friend_request(self, user_id: str) -> bool:
-        if await self.db.is_blacklisted("user", user_id):
+        member = await self.member_allowed_for_action(user_id, "Friend request")
+        if not member:
             await self.db.update_friend_status(user_id, FRIEND_FAILED)
-            await self.db.log(f"Friend request skipped for blacklisted user {user_id}.", "info")
             return False
+        username = member.get("username") or user_id
         selected = await self.choose_account(user_id)
         if not selected:
             await self.db.update_friend_status(user_id, FRIEND_FAILED)
+            await self.db.log(f"Friend request failed for {username}: no active Discord account available.", "error")
             return False
         account_id, client = selected
         try:
@@ -293,7 +311,7 @@ class BotState:
                 raise RuntimeError("discord.py-self user object has no send_friend_request method")
             await recipient.send_friend_request()
         except discord.Forbidden as exc:
-            await self.db.log(f"Friend request failed for {user_id}: Discord did not allow a friend request to this user ({exc}). Account stays active.", "error")
+            await self.db.log(f"Friend request failed for {username}: Discord refused this friend request for this user. Account stays active. Details: {exc}", "error")
             await self.db.update_friend_status(user_id, FRIEND_FAILED)
             return False
         except discord.HTTPException as exc:

@@ -87,6 +87,7 @@ class Database:
                     CREATE TABLE IF NOT EXISTS "Member" (
                         "userId" TEXT PRIMARY KEY,
                         username TEXT NOT NULL,
+                        "guildId" TEXT,
                         "joinTime" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
                         status TEXT NOT NULL DEFAULT 'pending',
                         "interestScore" DOUBLE PRECISION,
@@ -99,6 +100,7 @@ class Database:
                     )
                     """
                 )
+                cur.execute('ALTER TABLE "Member" ADD COLUMN IF NOT EXISTS "guildId" TEXT')
                 cur.execute(
                     """
                     CREATE TABLE IF NOT EXISTS "Conversation" (
@@ -238,24 +240,25 @@ class Database:
                 cur.execute('UPDATE "Account" SET status = %s WHERE id = %s', (status, account_id))
             conn.commit()
 
-    async def upsert_member_join(self, user_id: str, username: str, friend_request_pending: bool) -> None:
-        await self.run(self._upsert_member_join, user_id, username, friend_request_pending)
+    async def upsert_member_join(self, user_id: str, username: str, friend_request_pending: bool, guild_id: str | None = None) -> None:
+        await self.run(self._upsert_member_join, user_id, username, friend_request_pending, guild_id)
 
-    def _upsert_member_join(self, user_id: str, username: str, friend_request_pending: bool) -> None:
+    def _upsert_member_join(self, user_id: str, username: str, friend_request_pending: bool, guild_id: str | None) -> None:
         friend_status = FRIEND_PENDING if friend_request_pending else FRIEND_IDLE
         with self.connect() as conn:
             with conn.cursor() as cur:
                 cur.execute(
                     """
-                    INSERT INTO "Member" ("userId", username, status, "friendRequestStatus", "joinTime")
-                    VALUES (%s, %s, %s, %s, NOW())
+                    INSERT INTO "Member" ("userId", username, "guildId", status, "friendRequestStatus", "joinTime")
+                    VALUES (%s, %s, %s, %s, %s, NOW())
                     ON CONFLICT ("userId") DO UPDATE
                     SET username = EXCLUDED.username,
+                        "guildId" = COALESCE(EXCLUDED."guildId", "Member"."guildId"),
                         status = EXCLUDED.status,
                         "friendRequestStatus" = EXCLUDED."friendRequestStatus",
                         "joinTime" = NOW()
                     """,
-                    (user_id, username, MEMBER_PENDING, friend_status),
+                    (user_id, username, guild_id, MEMBER_PENDING, friend_status),
                 )
             conn.commit()
 
@@ -277,7 +280,7 @@ class Database:
     def _pending_members(self) -> list[dict]:
         with self.connect() as conn:
             with conn.cursor() as cur:
-                cur.execute('SELECT "userId", username, "joinTime", "friendRequestStatus" FROM "Member" WHERE status = %s', (MEMBER_PENDING,))
+                cur.execute('SELECT "userId", username, "guildId", "joinTime", "friendRequestStatus" FROM "Member" WHERE status = %s', (MEMBER_PENDING,))
                 columns = [desc.name for desc in cur.description]
                 return [dict(zip(columns, row)) for row in cur.fetchall()]
 
