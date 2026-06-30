@@ -4,7 +4,6 @@ import sys
 import discord
 
 from captcha import solve_captcha_with_anysolver
-from utils import format_delay
 
 
 class OutreachClient(discord.Client):
@@ -33,11 +32,6 @@ class OutreachClient(discord.Client):
         await self.state.db.upsert_member_join(user_id, member.name, bool(config.get("enableFriendRequests")))
         await self.state.db.assign_account(user_id, self.account["id"])
         await self.state.db.log(f"Member joined whitelisted server {guild_id}: {member.name} ({member.id})", "info")
-        if config.get("enableFriendRequests"):
-            friend_delay = self.state.friend_delay_seconds(config)
-            await self.state.db.log(f"Friend request queued for {member.name} ({member.id}) in {format_delay(friend_delay)}.", "info")
-        dm_delay = self.state.initial_delay_seconds(config)
-        await self.state.db.log(f'Initial DM queued for {member.name} ({member.id}) in {format_delay(dm_delay)} (assigned account: "{self.account.get("username") or self.account["id"]}").', "info")
 
     async def on_message(self, message: discord.Message) -> None:
         if message.author.bot or (self.user and message.author.id == self.user.id):

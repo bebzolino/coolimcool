@@ -149,7 +149,8 @@ class BotState:
         if key in self.tasks:
             return
         loop = asyncio.get_running_loop()
-        earliest = loop.time() + max(0, delay_seconds)
+        base_delay = max(0, delay_seconds)
+        earliest = loop.time() + base_delay
         slot = max(earliest, self.next_slot_at.get("account_action", 0.0))
         self.next_slot_at["account_action"] = slot + self.spread_seconds(kind)
         final_delay = max(0, slot - loop.time())
@@ -158,7 +159,14 @@ class BotState:
         task.add_done_callback(lambda _: self.tasks.pop(key, None))
         run_at = datetime.fromtimestamp(utc_now().timestamp() + final_delay, timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
         label = self.task_label(kind)
-        asyncio.create_task(self.db.log(f"{label} queued for {username} ({user_id}). Planned in {format_delay(final_delay)} at {run_at}.", "info"))
+        if final_delay > base_delay + 60:
+            message = (
+                f"{label} queued for {username} ({user_id}). "
+                f"Dashboard delay is {format_delay(base_delay)}, queue spread moved it to {format_delay(final_delay)} at {run_at}."
+            )
+        else:
+            message = f"{label} queued for {username} ({user_id}). Planned in {format_delay(final_delay)} at {run_at}."
+        asyncio.create_task(self.db.log(message, "info"))
 
     async def run_scheduled(self, username: str, user_id: str, kind: str, delay_seconds: float, callback) -> None:
         await asyncio.sleep(delay_seconds)
